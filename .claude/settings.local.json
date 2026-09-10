@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bun run:*)",
+      "Bash(npm run:*)",
+      "Bash(npm install:*)",
+      "Bash(curl:*)",
+      "Bash(cat \"C:/Users/mathe/Desktop/triagem honjoya e lima/.lovable/\"*)",
+      "Bash(cat \"C:/Users/mathe/Desktop/triagem honjoya e lima/.lovable/plan/\"*)",
+      "Bash(cp \"C:/Users/mathe/Downloads/ChatGPT Image 9 de set. de 2026, 20_18_55.png\" \"C:/Users/mathe/Desktop/triagem honjoya e lima/public/honjoya-lima-logo.png\")",
+      "Bash(cp \"C:/Users/mathe/Downloads/ChatGPT Image 9 de set. de 2026, 20_21_59.png\" \"C:/Users/mathe/Desktop/triagem honjoya e lima/public/honjoya-lima-equipe.png\")",
+      "Bash(cp \"C:/Users/mathe/Downloads/ChatGPT Image 9 de set. de 2026, 20_18_55.png\" \"C:/Users/mathe/Desktop/triagem honjoya e lima/public/honjoya-lima-equipe.png\")",
+      "Bash(cp \"C:/Users/mathe/Downloads/ChatGPT Image 9 de set. de 2026, 20_21_59.png\" \"C:/Users/mathe/Desktop/triagem honjoya e lima/public/honjoya-lima-logo.png\")"
+    ]
+  }
+}
