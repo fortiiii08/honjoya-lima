@@ -16,7 +16,7 @@ import {
 import { useMemo, useState, type ChangeEvent, type ReactNode } from "react";
 import teamAsset from "../assets/honjoya-lima-equipe.png.asset.json";
 import logoAsset from "../assets/honjoya-lima-logo.png.asset.json";
-import { fichas, visibleSections, type Field, type FichaId, type FieldType } from "../lib/fichas";
+import { buildSections, fichas, isDisplayOnly, type Field, type FichaId, type FieldType } from "../lib/fichas";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -58,8 +58,12 @@ function Index() {
   const [open, setOpen] = useState<string | null>("atendimento");
   const [copied, setCopied] = useState(false);
   const fichaInfo = fichas.find((f) => f.id === ficha);
-  const sections = useMemo(() => (ficha ? visibleSections(ficha, values) : []), [ficha, values]);
-  const answered = (field: Field) => field.type !== "heading" && !!values[field.id]?.trim();
+  const sections = useMemo(() => (ficha ? buildSections(ficha) : []), [ficha]);
+  const answered = (field: Field) => !isDisplayOnly(field) && !!values[field.id]?.trim();
+  const display = (field: Field) => {
+    const value = values[field.id] ?? "";
+    return field.type === "date" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value.split("-").reverse().join("/") : value;
+  };
   const completed = sections.filter((s) => s.fields.some(answered)).length;
   const setValue = (id: string, value: string, type?: FieldType) => setValues((old) => ({ ...old, [id]: mask(value, type) }));
   const fieldLabel = (field: Field) => (field.group ? `${field.group} · ${field.label}` : field.label);
@@ -74,7 +78,7 @@ function Index() {
     "",
     ...sections.filter((section) => section.fields.some(answered)).flatMap((section, i) => [
       `${i + 1}. ${section.title.toUpperCase()}`,
-      ...section.fields.filter(answered).map((field) => `${fieldLabel(field)}: ${values[field.id]}`),
+      ...section.fields.filter(answered).map((field) => `${fieldLabel(field)}: ${display(field)}`),
       "",
     ]),
   ].join("\n");
@@ -182,7 +186,7 @@ function Index() {
       // Fields
       filled.forEach((field) => {
         const labelText = fieldLabel(field);
-        const valueText = values[field.id]!;
+        const valueText = display(field);
 
         // Measure label width to place value right after
         doc.setFont("helvetica", "bold");
@@ -397,8 +401,9 @@ function FieldControl({ field, value, onChange }: { field: Field; value: string;
   const common = `min-h-12 w-full border border-input bg-background px-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/60 focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/15`;
   const wrap = field.full ? "sm:col-span-6" : field.third ? "sm:col-span-2" : "sm:col-span-3";
   if (field.type === "heading") return <div className="col-span-full -mb-2 border-b border-brand-gold/40 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-widest text-brand-deep">{field.label}</div>;
+  if (field.type === "note") return <p className="col-span-full border-l-2 border-brand-gold bg-brand-paper px-3 py-2 text-xs italic leading-5 text-muted-foreground">{field.label}</p>;
   const label = <span className="mb-2 block text-xs font-semibold leading-5 text-foreground">{field.label}{field.required && <span className="ml-1 text-brand-gold">*</span>}{field.hint && <span className="font-normal text-muted-foreground"> · {field.hint}</span>}</span>;
-  if (field.type === "radio") return <fieldset className={wrap}><legend>{label}</legend><div className="flex flex-wrap gap-2">{field.options?.map((option) => <label key={option} className={`cursor-pointer border px-3 py-2 text-sm transition ${value === option ? "border-brand-gold bg-brand-mint text-brand-deep" : "border-input bg-background hover:border-brand-gold/60"}`}><input className="sr-only" type="radio" name={field.id} checked={value === option} onChange={() => onChange(option)} />{option}</label>)}</div></fieldset>;
+  if (field.type === "radio") return <fieldset className={wrap}><legend>{label}</legend><div className="flex flex-wrap gap-2">{field.options?.map((option) => <label key={option} className={`cursor-pointer border px-3 py-2 text-sm transition ${value === option ? "border-brand-gold bg-brand-mint text-brand-deep" : "border-input bg-background hover:border-brand-gold/60"}`}><input className="sr-only" type="radio" name={field.id} checked={value === option} onChange={() => onChange(option)} onClick={() => value === option && onChange("")} />{option}</label>)}</div></fieldset>;
   if (field.type === "checkboxes") {
     const selected = value ? value.split(" | ") : [];
     return <fieldset className={wrap}><legend>{label}</legend><div className="flex flex-wrap gap-2">{field.options?.map((option) => { const active = selected.includes(option); return <label key={option} className={`cursor-pointer border px-3 py-2 text-sm transition ${active ? "border-brand-gold bg-brand-mint text-brand-deep" : "border-input bg-background hover:border-brand-gold/60"}`}><input className="sr-only" type="checkbox" checked={active} onChange={() => onChange(active ? selected.filter((item) => item !== option).join(" | ") : [...selected, option].join(" | "))} />{active && <Check className="mr-1 inline size-3" />}{option}</label>; })}</div></fieldset>;
