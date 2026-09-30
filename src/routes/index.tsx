@@ -1,12 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import {
+  ArrowRight,
+  Briefcase,
   Check,
   ChevronDown,
   Clipboard,
   Download,
   FileDown,
   LockKeyhole,
+  Landmark,
   MessageCircle,
+  Pill,
   ShieldCheck,
 } from "lucide-react";
 import { useMemo, useState, type ChangeEvent, type ReactNode } from "react";
@@ -35,6 +39,8 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
+const fichaIcons = { geral: Briefcase, farmacia: Pill, bancario: Landmark } satisfies Record<FichaId, unknown>;
+
 const digits = (value: string, max: number) => value.replace(/\D/g, "").slice(0, max);
 function mask(value: string, type?: FieldType) {
   const d = digits(value, type === "cnpj" ? 14 : type === "cpf" ? 11 : type === "cep" ? 8 : type === "phone" ? 11 : 99);
@@ -57,7 +63,10 @@ function Index() {
   const completed = sections.filter((s) => s.fields.some(answered)).length;
   const setValue = (id: string, value: string, type?: FieldType) => setValues((old) => ({ ...old, [id]: mask(value, type) }));
   const fieldLabel = (field: Field) => (field.group ? `${field.group} · ${field.label}` : field.label);
-  const chooseFicha = (id: FichaId) => { setFicha(id); setOpen("atendimento"); };
+  const chooseFicha = (id: FichaId) => {
+    setFicha(id); setOpen("atendimento");
+    requestAnimationFrame(() => document.getElementById("ficha")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  };
 
   const reportText = () => [
     (fichaInfo?.title ?? "Ficha de Atendimento Trabalhista").toUpperCase(),
@@ -293,33 +302,41 @@ function Index() {
       </header>
 
       <section id="inicio" className="relative isolate overflow-hidden bg-brand-deep">
-        <img src={teamAsset.url} alt="Advogados da Honjoya & Lima no escritório" className="h-[580px] w-full object-cover object-[68%_center] sm:h-[720px] lg:h-[860px]" />
-        <div className="absolute inset-0 bg-hero-overlay" />
-        <div className="absolute inset-0 mx-auto flex max-w-6xl items-end px-5 pb-10 sm:px-8 sm:pb-16">
-          <div className="max-w-2xl text-brand-light">
-            <div className="mb-4 h-px w-16 bg-brand-gold" />
-            <h1 className="font-display text-4xl leading-tight sm:text-6xl">Ficha de Atendimento Trabalhista</h1>
-            <p className="mt-4 max-w-xl text-sm leading-6 text-brand-light/85 sm:text-base">Conte o que aconteceu com calma. Nossa equipe analisará cada detalhe do seu caso com atenção e confidencialidade.</p>
+        <img src={teamAsset.url} alt="Advogados da Honjoya & Lima no escritório" className="absolute inset-0 -z-10 h-full w-full object-cover object-[68%_center]" />
+        <div className="absolute inset-0 -z-10 bg-hero-overlay" />
+        <div className="mx-auto flex min-h-[580px] max-w-6xl items-end px-5 pb-10 pt-40 sm:min-h-[720px] sm:px-8 sm:pb-16 lg:min-h-[860px]">
+          <div className="w-full text-brand-light">
+            <div className="max-w-2xl">
+              <div className="mb-4 h-px w-16 bg-brand-gold" />
+              <h1 className="font-display text-4xl leading-tight sm:text-6xl">Ficha de Atendimento Trabalhista</h1>
+              <p className="mt-4 max-w-xl text-sm leading-6 text-brand-light/85 sm:text-base">Conte o que aconteceu com calma. Nossa equipe analisará cada detalhe do seu caso com atenção e confidencialidade.</p>
+            </div>
+            <p className="mt-8 text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-gold">Escolha o tipo de ficha</p>
+            <div className="mt-3 grid max-w-4xl gap-3 sm:grid-cols-3" role="radiogroup" aria-label="Tipo de ficha">
+              {fichas.map((f) => {
+                const active = ficha === f.id;
+                const Icon = fichaIcons[f.id];
+                return <button key={f.id} type="button" role="radio" aria-checked={active} onClick={() => chooseFicha(f.id)} className={`group flex cursor-pointer items-center gap-3 border px-4 py-4 text-left shadow-lg backdrop-blur transition duration-200 hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold ${active ? "border-brand-gold bg-brand-gold text-brand-ink" : "border-brand-gold/50 bg-brand-deep/70 text-brand-light hover:border-brand-gold hover:bg-brand-deep/90"}`}>
+                  <span className={`grid size-11 shrink-0 place-items-center rounded-full ${active ? "bg-brand-ink text-brand-gold" : "bg-brand-gold/15 text-brand-gold"}`}>{active ? <Check className="size-5" /> : <Icon className="size-5" />}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-display text-xl leading-tight">{f.label}</span>
+                    <span className={`mt-0.5 block text-xs leading-4 ${active ? "text-brand-ink/75" : "text-brand-light/70"}`}>{f.description}</span>
+                    <span className={`mt-2 block text-[10px] font-semibold uppercase tracking-widest ${active ? "text-brand-ink" : "text-brand-gold"}`}>{active ? "Selecionada" : "Preencher ficha"}</span>
+                  </span>
+                  <ArrowRight className={`size-5 shrink-0 transition-transform group-hover:translate-x-1 ${active ? "text-brand-ink" : "text-brand-gold"}`} />
+                </button>;
+              })}
+            </div>
           </div>
         </div>
       </section>
 
-      <section className="border-b border-brand-gold/30 bg-brand-paper px-4 py-8">
-        <div className="mx-auto max-w-4xl">
-          <p className="text-center text-sm leading-6 text-muted-foreground">Escolha o <strong className="text-foreground">tipo de ficha</strong>. Os campos aparecem conforme a ficha e as respostas marcadas com “Sim”. Pontos, barras e traços aparecem sozinhos.</p>
-          <div className="mt-5 grid gap-3 sm:grid-cols-3" role="radiogroup" aria-label="Tipo de ficha">
-            {fichas.map((f) => {
-              const active = ficha === f.id;
-              return <button key={f.id} type="button" role="radio" aria-checked={active} onClick={() => chooseFicha(f.id)} className={`border px-4 py-4 text-left transition ${active ? "border-brand-gold bg-brand-deep text-brand-light" : "border-border bg-card hover:border-brand-gold/60"}`}>
-                <span className="flex items-center gap-2 font-display text-lg leading-tight">{active && <Check className="size-4 text-brand-gold" />}{f.label}</span>
-                <span className={`mt-1 block text-xs ${active ? "text-brand-light/70" : "text-muted-foreground"}`}>{f.description}</span>
-              </button>;
-            })}
-          </div>
-        </div>
+      <section className="border-b border-brand-gold/30 bg-brand-paper px-4 py-7 text-center">
+        <p className="mx-auto max-w-2xl text-sm leading-6 text-muted-foreground">{ficha ? <>Ficha <strong className="text-foreground">{fichaInfo?.label}</strong> selecionada. </> : <>Escolha o <strong className="text-foreground">tipo de ficha</strong> acima para começar. </>}Os campos aparecem conforme as respostas marcadas com “Sim”. Pontos, barras e traços aparecem sozinhos.</p>
       </section>
 
       {ficha && <>
+      <div id="ficha" className="scroll-mt-20 sm:scroll-mt-24" />
       <div className="sticky top-20 z-40 border-b border-brand-gold/30 bg-brand-ink px-4 py-3 text-brand-light sm:top-24">
         <div className="mx-auto max-w-4xl">
           <div className="mb-2 flex items-center justify-between text-[10px] font-semibold tracking-[0.16em]"><span className="uppercase">{fichaInfo?.label} · PROGRESSO</span><span className="text-brand-gold">{completed} DE {sections.length} SEÇÕES</span></div>
