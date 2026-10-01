@@ -11,12 +11,13 @@ import {
   Landmark,
   MessageCircle,
   Pill,
+  Plus,
+  Trash2,
   ShieldCheck,
 } from "lucide-react";
-import { useMemo, useState, type ChangeEvent, type ReactNode } from "react";
-import teamAsset from "../assets/honjoya-lima-equipe.png.asset.json";
+import { Fragment, useMemo, useState, type ChangeEvent, type ReactNode } from "react";
 import logoAsset from "../assets/honjoya-lima-logo.png.asset.json";
-import { buildSections, fichas, isDisplayOnly, type Field, type FichaId, type FieldType } from "../lib/fichas";
+import { buildSections, fichas, HORAS_EXTRAS, isDisplayOnly, type Field, type FichaId, type FieldType } from "../lib/fichas";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -57,8 +58,9 @@ function Index() {
   const [ficha, setFicha] = useState<FichaId | null>(null);
   const [open, setOpen] = useState<string | null>("atendimento");
   const [copied, setCopied] = useState(false);
+  const [locais, setLocais] = useState(1);
   const fichaInfo = fichas.find((f) => f.id === ficha);
-  const sections = useMemo(() => (ficha ? buildSections(ficha) : []), [ficha]);
+  const sections = useMemo(() => (ficha ? buildSections(ficha, locais) : []), [ficha, locais]);
   const answered = (field: Field) => !isDisplayOnly(field) && !!values[field.id]?.trim();
   const display = (field: Field) => {
     const value = values[field.id] ?? "";
@@ -68,8 +70,27 @@ function Index() {
   const setValue = (id: string, value: string, type?: FieldType) => setValues((old) => ({ ...old, [id]: mask(value, type) }));
   const fieldLabel = (field: Field) => (field.group ? `${field.group} · ${field.label}` : field.label);
   const chooseFicha = (id: FichaId) => {
-    setFicha(id); setOpen("atendimento");
+    setFicha(id); setOpen("atendimento"); setLocais(1);
     requestAnimationFrame(() => document.getElementById("ficha")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  };
+  const addLocal = () => {
+    const n = locais + 1;
+    setLocais(n);
+    requestAnimationFrame(() => document.getElementById(`local-${n}`)?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  };
+  // Remove o local n e apaga as respostas dele; os locais seguintes descem um número (Local 3 vira Local 2...).
+  const removeLocal = (n: number) => {
+    setValues((old) => {
+      const next: Record<string, string> = {};
+      for (const [id, value] of Object.entries(old)) {
+        const m = id.match(/^he_(\d+)_(.*)$/);
+        if (!m) next[id] = value;
+        else if (Number(m[1]) < n) next[id] = value;
+        else if (Number(m[1]) > n) next[`he_${Number(m[1]) - 1}_${m[2]}`] = value;
+      }
+      return next;
+    });
+    setLocais(locais - 1);
   };
 
   const reportText = () => [
@@ -152,22 +173,22 @@ function Index() {
     sections.filter((section) => section.fields.some(answered)).forEach((section, idx) => {
       const filled = section.fields.filter(answered);
 
-      checkPage(14);
+      checkPage(16);
 
       // Section header bar
       doc.setFillColor(238, 232, 218); // paper tone
-      doc.rect(marginL, y - 4, contentW, 10, "F");
+      doc.rect(marginL, y - 4, contentW, 12, "F");
       doc.setDrawColor(176, 139, 62);
       doc.setLineWidth(0.4);
-      doc.rect(marginL, y - 4, contentW, 10);
+      doc.rect(marginL, y - 4, contentW, 12);
 
       // Section number badge
       doc.setFillColor(15, 54, 46);
-      doc.rect(marginL, y - 4, 10, 10, "F");
+      doc.rect(marginL, y - 4, 10, 12, "F");
       doc.setTextColor(176, 139, 62);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(7);
-      doc.text(String(idx + 1), marginL + 5, y + 2, { align: "center" });
+      doc.text(String(idx + 1), marginL + 5, y + 3, { align: "center" });
 
       // Section title
       doc.setTextColor(15, 54, 46);
@@ -181,10 +202,22 @@ function Index() {
       doc.setTextColor(100, 90, 70);
       doc.text(section.subtitle, marginL + 13, y + 6.5);
 
-      y += 14;
+      y += 15;
 
       // Fields
-      filled.forEach((field) => {
+      filled.forEach((field, fieldIdx) => {
+        // Cada pedido começa um bloco separado: espaço extra e linha tracejada antes dele
+        if (field.pedido && fieldIdx > 0) {
+          checkPage(16);
+          y += 3;
+          doc.setDrawColor(200, 190, 170);
+          doc.setLineWidth(0.2);
+          doc.setLineDashPattern([1, 1], 0);
+          doc.line(marginL + 4, y - 3, marginL + contentW, y - 3);
+          doc.setLineDashPattern([], 0);
+          y += 4;
+        }
+
         const labelText = fieldLabel(field);
         const valueText = display(field);
 
@@ -306,7 +339,7 @@ function Index() {
       </header>
 
       <section id="inicio" className="relative isolate overflow-hidden bg-brand-deep">
-        <img src={teamAsset.url} alt="Advogados da Honjoya & Lima no escritório" className="absolute inset-0 -z-10 h-full w-full object-cover object-[68%_center]" />
+        <img src="/honjoya-lima-escritorio.jpg" alt="Recepção do escritório Honjoya & Lima Advogados" className="absolute inset-0 -z-10 h-full w-full object-cover object-[68%_center]" />
         <div className="absolute inset-0 -z-10 bg-hero-overlay" />
         <div className="mx-auto flex min-h-[580px] max-w-6xl items-end px-5 pb-10 pt-40 sm:min-h-[720px] sm:px-8 sm:pb-16 lg:min-h-[860px]">
           <div className="w-full text-brand-light">
@@ -361,7 +394,18 @@ function Index() {
               <ChevronDown className={`size-4 shrink-0 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`} />
             </button>
             {isOpen && <div className="grid grid-cols-1 gap-x-4 gap-y-5 border-t border-border px-4 py-6 sm:grid-cols-6 sm:px-6">
-              {section.fields.map((field) => <FieldControl key={field.id} field={field} value={values[field.id] ?? ""} onChange={(value) => setValue(field.id, value, field.type)} />)}
+              {section.fields.map((field, i) => {
+                const n = localOf(field);
+                const fimDoLocal = n !== null && locais > 1 && localOf(section.fields[i + 1]) !== n;
+                return <Fragment key={field.id}>
+                  <FieldControl field={field} value={values[field.id] ?? ""} onChange={(value) => setValue(field.id, value, field.type)} onRemoveLocal={n !== null && locais > 1 ? () => removeLocal(n) : undefined} />
+                  {fimDoLocal && <div className="col-span-full flex justify-end"><button type="button" onClick={() => removeLocal(n)} className="inline-flex min-h-11 items-center gap-2 border border-input bg-background px-4 text-sm font-semibold text-muted-foreground transition hover:border-destructive hover:text-destructive"><Trash2 className="size-4" /> Remover local {n}</button></div>}
+                </Fragment>;
+              })}
+              {section.id === HORAS_EXTRAS && <div className="col-span-full flex flex-col gap-3 border-2 border-dashed border-brand-gold bg-brand-paper p-4 sm:flex-row sm:items-center sm:p-5">
+                <p className="flex-1 text-sm leading-5 text-muted-foreground">Trabalhou em <strong className="text-foreground">outro local, cargo ou período</strong>? Adicione mais um local e preencha a jornada dele.</p>
+                <button type="button" onClick={addLocal} className="inline-flex min-h-14 items-center justify-center gap-2 bg-brand-gold px-6 text-base font-bold text-brand-ink shadow-lg transition hover:-translate-y-0.5 hover:bg-brand-gold-soft hover:shadow-xl"><Plus className="size-5" strokeWidth={3} /> Adicionar mais um local</button>
+              </div>}
               <div className="col-span-full flex justify-end border-t border-border pt-5">
                 <button type="button" onClick={() => { setOpen(sections[index + 1]?.id ?? null); requestAnimationFrame(() => window.scrollBy({ top: 180, behavior: "smooth" })); }} className="inline-flex min-h-11 items-center gap-2 bg-brand-deep px-5 text-sm font-semibold text-brand-light transition hover:bg-brand-green">
                   {isLast ? <Check className="size-4" /> : null}{isLast ? "Concluir triagem" : "Próxima seção"}
@@ -397,12 +441,22 @@ function Action({ children, icon, onClick, primary }: { children: ReactNode; ico
   return <button type="button" onClick={onClick} className={`inline-flex min-h-12 w-full items-center justify-center gap-2 border px-4 text-sm font-semibold transition ${primary ? "border-brand-gold bg-brand-gold text-brand-ink hover:bg-brand-gold-soft" : "border-brand-light/25 bg-transparent text-brand-light hover:border-brand-gold hover:text-brand-gold"}`}>{icon}{children}</button>;
 }
 
-function FieldControl({ field, value, onChange }: { field: Field; value: string; onChange: (value: string) => void }) {
+/** Número do local de horas extras a que o campo pertence (ids `he_<n>_...`), ou null. */
+function localOf(field?: Field) {
+  const m = field?.id.match(/^he_(\d+)_/);
+  return m ? Number(m[1]) : null;
+}
+
+function FieldControl({ field, value, onChange, onRemoveLocal }: { field: Field; value: string; onChange: (value: string) => void; onRemoveLocal?: (() => void) | undefined }) {
   const common = `min-h-12 w-full border border-input bg-background px-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/60 focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/15`;
   const wrap = field.full ? "sm:col-span-6" : field.third ? "sm:col-span-2" : "sm:col-span-3";
+  if (field.id.endsWith("_titulo") && localOf(field) !== null) return <div id={`local-${localOf(field)}`} className="col-span-full -mx-4 flex scroll-mt-40 items-center justify-between gap-3 bg-brand-deep px-4 py-3 sm:-mx-6 sm:px-6 sm:scroll-mt-48">
+    <span className="font-display text-2xl font-bold text-brand-gold">{field.label}</span>
+    {onRemoveLocal && <button type="button" onClick={onRemoveLocal} aria-label={`Remover ${field.label}`} title={`Remover ${field.label}`} className="grid size-10 place-items-center text-brand-light/70 transition hover:bg-destructive hover:text-white"><Trash2 className="size-5" /></button>}
+  </div>;
   if (field.type === "heading") return <div className="col-span-full -mb-2 border-b border-brand-gold/40 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-widest text-brand-deep">{field.label}</div>;
   if (field.type === "note") return <p className="col-span-full border-l-2 border-brand-gold bg-brand-paper px-3 py-2 text-xs italic leading-5 text-muted-foreground">{field.label}</p>;
-  const label = <span className="mb-2 block text-xs font-semibold leading-5 text-foreground">{field.label}{field.required && <span className="ml-1 text-brand-gold">*</span>}{field.hint && <span className="font-normal text-muted-foreground"> · {field.hint}</span>}</span>;
+  const label = <span className="mb-2 block text-base font-bold leading-6 text-foreground">{field.label}{field.required && <span className="ml-1 text-brand-gold">*</span>}{field.hint && <span className="font-normal text-muted-foreground"> · {field.hint}</span>}</span>;
   if (field.type === "radio") return <fieldset className={wrap}><legend>{label}</legend><div className="flex flex-wrap gap-2">{field.options?.map((option) => <label key={option} className={`cursor-pointer border px-3 py-2 text-sm transition ${value === option ? "border-brand-gold bg-brand-mint text-brand-deep" : "border-input bg-background hover:border-brand-gold/60"}`}><input className="sr-only" type="radio" name={field.id} checked={value === option} onChange={() => onChange(option)} onClick={() => value === option && onChange("")} />{option}</label>)}</div></fieldset>;
   if (field.type === "checkboxes") {
     const selected = value ? value.split(" | ") : [];

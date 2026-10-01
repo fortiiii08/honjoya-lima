@@ -1,5 +1,5 @@
 export type FieldType = "text" | "textarea" | "select" | "radio" | "checkboxes" | "date" | "time" | "currency" | "cpf" | "cnpj" | "phone" | "cep" | "heading" | "note";
-export type Field = { id: string; label: string; hint?: string; type?: FieldType; options?: string[]; full?: boolean; third?: boolean; required?: boolean; group?: string | undefined };
+export type Field = { id: string; label: string; hint?: string; type?: FieldType; options?: string[]; full?: boolean; third?: boolean; required?: boolean; pedido?: boolean; group?: string | undefined };
 export type Section = { id: string; title: string; subtitle: string; fields: Field[] };
 export type FichaId = "geral" | "farmacia" | "bancario";
 
@@ -17,7 +17,8 @@ type Extra = Partial<Omit<Field, "id" | "label">>;
 const f = (id: string, label: string, extra: Extra = {}): Field => ({ id, label, ...extra });
 const full = (id: string, label: string, extra: Extra = {}) => f(id, label, { full: true, ...extra });
 const third = (id: string, label: string, extra: Extra = {}) => f(id, label, { third: true, ...extra });
-const yn = (id: string, label: string, extra: Extra = {}) => f(id, label, { type: "radio", options: yesNo, full: true, ...extra });
+/** Pergunta Sim/Não. Por padrão é um pedido da ficha (fica separado no PDF). */
+const yn = (id: string, label: string, extra: Extra = {}) => f(id, label, { type: "radio", options: yesNo, full: true, pedido: true, ...extra });
 const checks = (id: string, label: string, options: string[], extra: Extra = {}) => f(id, label, { type: "checkboxes", options, full: true, ...extra });
 const radio = (id: string, label: string, options: string[], extra: Extra = {}) => f(id, label, { type: "radio", options, full: true, ...extra });
 const date = (id: string, label: string, extra: Extra = {}) => f(id, label, { type: "date", ...extra });
@@ -42,23 +43,29 @@ const pontoSim = ["eletrônico", "manual", "sistema", "APP"];
 const pontoNao = ["62, I", "62, II", "62, III", "externo com anotação do ponto no APP"];
 const diasJornada = ["segunda a sexta", "segunda a sábado", "domingos", "feriados"];
 
-function periodo(ficha: FichaId, p: "a" | "b" | "c"): Field[] {
-  const k = (s: string) => `he_${p}_${s}`;
+/** Põe "Local n" no rótulo do relatório/PDF de cada campo do local. */
+const comLocal = (fields: Field[], n: number) => fields.map((x) => ({ ...x, group: x.group ? `Local ${n} · ${x.group}` : `Local ${n}` }));
+
+/** Horas extras de um local de trabalho. `n` = 1, 2, 3... (o cliente pode adicionar quantos locais quiser). */
+function periodo(ficha: FichaId, n: number): Field[] {
+  const k = (s: string) => `he_${n}_${s}`;
   const fields: Field[] = [
+    heading(k("titulo"), `Local ${n}`),
     full(k("cargo"), "Cargo"),
     date(k("de"), "Período"), date(k("ate"), "até"),
+    ...(ficha === "bancario" ? [f(k("agencia"), "Agência")] : []),
+    full(k("endereco"), ficha === "farmacia" ? "Endereço da loja" : "Endereço do local"),
+    textarea(k("funcoes"), "Funções"),
   ];
 
   if (ficha === "bancario") {
     fields.push(
-      radio(k("contratual"), "Jornada de trabalho contratual diária", p === "a" ? ["6 horas", "8 horas"] : ["4 horas", "6 horas", "8 horas"]),
+      radio(k("contratual"), "Jornada de trabalho contratual diária", n === 1 ? ["6 horas", "8 horas"] : ["4 horas", "6 horas", "8 horas"]),
       checks(k("dias"), "Jornada", diasJornada),
       checks(k("pontoSim"), "Estava sujeito a Cartão Ponto: Sim", pontoSim),
       checks(k("pontoNao"), "Estava sujeito a Cartão Ponto: Não", pontoNao),
       checks(k("descaracterizacao"), "Descaracterização", ["converter 224, § 2º para caput 224 da CLT", "converter 62, II para 224, § 2º"]),
-      yn(k("setimaOitava"), p === "a" ? "Sétima e oitava horas" : "Sétima e oitava hora"),
-      f(k("agencia"), "Agência"), f(k("endereco"), "Endereço"),
-      textarea(k("funcoes"), "Funções"),
+      yn(k("setimaOitava"), "Sétima e oitava horas"),
       heading(k("h"), "Horários"),
       ...horario(k("seg"), "Segunda a sexta das", "Intrajornada"),
       ...horario(k("sab"), "Sábado das", "Intrajornada"),
@@ -68,7 +75,7 @@ function periodo(ficha: FichaId, p: "a" | "b" | "c"): Field[] {
       full(k("interjornadaFreq"), "Frequência e horários"),
       yn(k("dsr"), "DSR em dobro (laborou sem folga 7 dias direto)"),
     );
-    return fields;
+    return comLocal(fields, n);
   }
 
   fields.push(
@@ -77,8 +84,6 @@ function periodo(ficha: FichaId, p: "a" | "b" | "c"): Field[] {
     radio(k("compensacao"), "Acordo de Compensação", ficha === "farmacia" ? ["sim", "não"] : yesNo),
     checks(k("pontoSim"), "Estava sujeito a Cartão Ponto: Sim", pontoSim),
     checks(k("pontoNao"), "Estava sujeito a Cartão Ponto: Não", pontoNao),
-    full(k("endereco"), ficha === "farmacia" && p === "a" ? "Endereço da loja" : "Endereço do local"),
-    textarea(k("funcoes"), "Funções"),
     heading(k("h"), "Horários"),
   );
 
@@ -101,7 +106,6 @@ function periodo(ficha: FichaId, p: "a" | "b" | "c"): Field[] {
       full(k("domQuais"), "Domingos e feriados · quantos/quais"),
       yn(k("outrosTurnos"), "Outros turnos"),
       textarea(k("outrosTurnosHorarios"), "Horários", { group: "Outros turnos" }),
-      f(k("bfDias"), "Black Friday – Dias"), f(k("bfHorarios"), "Horários", { group: "Black Friday" }),
     );
   }
 
@@ -111,10 +115,13 @@ function periodo(ficha: FichaId, p: "a" | "b" | "c"): Field[] {
     yn(k("dsr"), "DSR em dobro (laborou sem folga 7 dias direto)"),
     yn(k("dominical"), "Descanso dominical desrespeitado (Nunca folga aos domingos)"),
   );
-  return fields;
+  return comLocal(fields, n);
 }
 
-export function buildSections(ficha: FichaId): Section[] {
+/** Seção de horas extras: tem o botão "Adicionar mais um local". */
+export const HORAS_EXTRAS = "horasExtras";
+
+export function buildSections(ficha: FichaId, locais = 1): Section[] {
   const bank = ficha === "bancario";
   const atividades = bank ? ["Reunião", "Ações Universitárias", "Cursos", "Feirões", "Viagem"] : ["Reunião", "Cursos", "Viagem"];
 
@@ -122,11 +129,11 @@ export function buildSections(ficha: FichaId): Section[] {
     { id: "atendimento", title: "Atendimento", subtitle: "Dados do atendimento", fields: [
       f("atendimento", "Atendimento"), f("indicacao", "Indicação"),
       date("dataAtendimento", "Data do Atendimento"),
-      yn("digital", "Processo 100% digital", { full: false }),
-      yn("prioridade", "Prioridade na tramitação", { full: false }),
+      yn("digital", "Processo 100% digital", { full: false, pedido: false }),
+      yn("prioridade", "Prioridade na tramitação", { full: false, pedido: false }),
       f("prioridadeMotivo", "Motivo", { group: "Prioridade na tramitação" }),
       checks("urgencia", "Urgência", ["Prescrição", "Reintegração"], { full: false }),
-      yn("segredo", "Segredo de Justiça", { full: false }),
+      yn("segredo", "Segredo de Justiça", { full: false, pedido: false }),
     ]},
     { id: "qualificacao", title: "Qualificação", subtitle: "Dados do reclamante", fields: [
       full("nome", "Nome", { required: true }),
@@ -208,10 +215,10 @@ export function buildSections(ficha: FichaId): Section[] {
       full("ultimoCargo", "Último cargo"),
       ...grp("Jornada praticada", [third("jornadaIni", "Jornada praticada", { type: "time" }), third("jornadaFim", "às", { type: "time" }), third("jornadaIntra", "Intrajornada")]),
     ]},
-    ...(["a", "b", "c"] as const).map((p) => ({
-      id: `periodo_${p}`, title: `Horas extras – ${p})`, subtitle: "Jornada que será inserida na inicial",
-      fields: [note(`he_${p}_nota`, "Caso tenha pedido de horas extras, preencher com a jornada que será inserida na inicial:"), ...periodo(ficha, p)],
-    })),
+    { id: HORAS_EXTRAS, title: "Horas extras", subtitle: "Jornada que será inserida na inicial", fields: [
+      note("he_nota", "Caso tenha pedido de horas extras, preencher com a jornada que será inserida na inicial:"),
+      ...Array.from({ length: locais }, (_, i) => periodo(ficha, i + 1)).flat(),
+    ]},
     { id: "alemJornada", title: "Trabalhos além da jornada", subtitle: bank ? "Reuniões, ações universitárias, cursos, feirões e viagens" : "Reuniões, cursos e viagens", fields: [
       checks("alemJornada", "Trabalhos além da jornada", atividades),
       ...atividades.flatMap((a) => {
@@ -290,7 +297,7 @@ export function buildSections(ficha: FichaId): Section[] {
         checks("periculosidadeAgente", "Agente perigoso", ["gás", "inflamáveis", "motocicleta", "energia elétrica", "vigilante ou segurança"]),
         textarea("periculosidadeInfo", "Outras informações"),
       ]),
-      radio("insalubridade", "Adicional de insalubridade", bank ? yesNo : [...yesNo, "Majorar de 20% para 40%"]),
+      radio("insalubridade", "Adicional de insalubridade", bank ? yesNo : [...yesNo, "Majorar de 20% para 40%"], { pedido: true }),
       ...grp("Insalubridade", [
         checks("insalubridadeAgente", "Agente insalubre", ["frio", "calor", "biológico", "químico", "ruído", "vibração", "poeira"]),
         textarea("insalubridadeInfo", "Outras informações"),
